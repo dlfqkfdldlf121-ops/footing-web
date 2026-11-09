@@ -48,7 +48,8 @@ def row_key(t, r):
     """라벨 + (첫 칸이 비면 둘째 칸) — 회사명 열 등을 위해."""
     lab = r['cells'][0] or ''
     c1 = r['cells'][1] if len(r['cells']) > 1 else None
-    if c1 and r['nums'][1] is None and c1 not in ('-',) and (not lab or lab in ('지분증권', '채무증권')):
+    # 둘째 칸이 숫자가 아닌 글자(회사명·차입처 등)면 행 이름에 붙인다 — 같은 구분 아래 여러 회사가 나오는 표
+    if c1 and r['nums'][1] is None and c1 not in ('-',) and re.search(r'[가-힣A-Za-z]', c1):
         lab = (lab + ' ' + c1).strip()
     return norm(lab)
 
@@ -92,8 +93,8 @@ def compare(A, B, want_cols, period_of=None, xlat=None):
     used_b = set()
     rows_out = []
     for a in A['tables']:
-        acols = [i for i, c in enumerate(a['cols']) if any(w in (c or '') for w in want_cols)
-                 and not re.search(r'주\s*석', c or '')]
+        want = want_cols if callable(want_cols) else (lambda c: any(w in c for w in want_cols))
+        acols = [i for i, c in enumerate(a['cols']) if want(c or '') and not re.search(r'주\s*석', c or '')]
         if not acols:
             continue
         na = nums_of(a)
@@ -143,6 +144,16 @@ def is_total(label):
     return bool(TOTAL.search(l)) or l in ('합계', '소계', '계', '총계')
 
 
+def push_infer(stack, v, tol):
+    """세부행 v를 쌓되, v가 바로 앞 연속 k개(k≥2) 합과 같으면 이름 없는 소계로 보고 그 k개를 대체한다.
+    예: 매출채권 100 / 대손충당금 (10) / 매출채권(순액) 90 → 90 하나로 접힌다."""
+    for k in range(2, len(stack) + 1):
+        if v != 0 and abs(sum(stack[-k:]) - v) <= tol:
+            del stack[-k:]
+            break
+    stack.append(v)
+
+
 def subtotal_checks(T, tol):
     """시트5: 표별 합계·소계 및 변동표 기초→기말."""
     out = []
@@ -151,13 +162,19 @@ def subtotal_checks(T, tol):
         rows = t['rows']
         ncol = t['ncol']
         # (1) 열 합계
+        CUR = re.compile(r'^(USD|EUR|JPY|CNY|VND|PEN|GBP|HKD|SGD|AUD|CAD|IDR|THB|PHP|MYR|INR|MXN|BRL|CHF)\b')
         for j in range(1, ncol):
-            seg = []          # 직전 합계 이후 세부행 값
+            if any(CUR.match((r['cells'][j] or '').strip()) for r in rows if j < len(r['cells'])):
+                continue          # 외화 표시가 섞인 열은 원화 합계와 비교 불가
+            seg = []          # 직전 합계 이후 세부행 값(이름 없는 소계는 접어서 보관)
             allv = []         # 표 처음부터 비합계행
             subs = []         # 소계행 값
             for r in rows:
                 v = r['nums'][j] if j < len(r['nums']) else None
                 if not isinstance(v, (int, float)):
+                    # 금액이 하나도 없는 라벨 행 = 구간 제목(예: '당기손익으로 인식되는 금액') → 소계 구간 새로 시작
+                    if (r['cells'][0] or '').strip() and not any(isinstance(x, (int, float)) for x in r['nums'][1:]):
+                        seg = []
                     continue
                 if is_total(r['cells'][0]) or (len(r['cells']) > 1 and is_total(r['cells'][1])):
                     if seg and v != 0:
@@ -174,20 +191,24 @@ def subtotal_checks(T, tol):
                         subs.append(v)
                     seg = []
                 else:
-                    seg.append(v); allv.append(v)
+                    push_infer(seg, v, tol); push_infer(allv, v, tol)
         # (1b) 행 합계: '합계' 열 = 앞쪽 금액 열 합 (부문별 정보 등)
         tc = [i for i, c in enumerate(t['cols']) if re.sub(r'\s', '', c or '').endswith('합계')]
         if tc and tc[-1] == ncol - 1 and ncol >= 4:
             e = tc[-1]
             skip = {i for i, c in enumerate(t['cols']) if re.search(r'주\s*석', c or '')}
+            rowres = []
             for r in rows:
                 vals = [x for i, x in enumerate(r['nums'][1:e], 1) if isinstance(x, (int, float)) and i not in skip]
                 ve = r['nums'][e] if e < len(r['nums']) else None
                 if not isinstance(ve, (int, float)) or len(vals) < 2 or any(isinstance(x, float) for x in vals):
                     continue
-                out.append(dict(page=t['page'], sec=sec, unit=t['unit'] or '천원',
-                                target='%s · 행 합계' % (r['cells'][0] or '').strip(),
-                                shown=ve, recalc=sum(vals), n=len(vals), exact=abs(sum(vals) - ve) <= tol))
+                rowres.append(dict(page=t['page'], sec=sec, unit=t['unit'] or '천원',
+                                   target='%s · 행 합계' % (r['cells'][0] or '').strip(),
+                                   shown=ve, recalc=sum(vals), n=len(vals), exact=abs(sum(vals) - ve) <= tol))
+            # 합산 표가 아닌 경우(계약금액·진행률 등 열이 섞인 표)는 대부분 행이 안 맞는다 → 표 전체 제외
+            if rowres and sum(x['exact'] for x in rowres) * 2 >= len(rowres):
+                out += rowres
         # (2) 변동표: 첫 값열이 '초', 마지막 값열이 '말'
         cols = t['cols']
         idx = [i for i, c in enumerate(cols) if c]

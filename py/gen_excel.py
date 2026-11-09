@@ -209,15 +209,18 @@ def build(data, out):
     tol = data.get('tolerance', {'원': 0, '천원': 1, '주': 0})
     tol3 = data.get('tolerance_sheet3', 500)
     findings = order_findings(data['findings'])
+    names = list(SHEETS)
+    for k, v in (data.get('sheet_names') or {}).items():
+        names[int(k)] = v                      # 분기 보고서: '2.전분기_분기보고서대사'
     wb = Workbook()
-    ws0 = wb.active; ws0.title = SHEETS[0]
+    ws0 = wb.active; ws0.title = names[0]
     st = {}
-    st[1] = compare_sheet(wb.create_sheet(SHEETS[1]), data['s1'], False, tol)
-    st[2] = compare_sheet(wb.create_sheet(SHEETS[2]), data['s2'], True, tol)
-    st[3] = sheet3(wb.create_sheet(SHEETS[3]), data['s3'], tol3)
-    st[4] = sheet4(wb.create_sheet(SHEETS[4]), data['s4'], tol.get('천원', 1))
-    st[5] = sheet5(wb.create_sheet(SHEETS[5]), data['s5'], tol)
-    st[6] = sheet6(wb.create_sheet(SHEETS[6]), findings)
+    st[1] = compare_sheet(wb.create_sheet(names[1]), data['s1'], False, tol)
+    st[2] = compare_sheet(wb.create_sheet(names[2]), data['s2'], True, tol)
+    st[3] = sheet3(wb.create_sheet(names[3]), data['s3'], tol3)
+    st[4] = sheet4(wb.create_sheet(names[4]), data['s4'], tol.get('천원', 1))
+    st[5] = sheet5(wb.create_sheet(names[5]), data['s5'], tol)
+    st[6] = sheet6(wb.create_sheet(names[6]), findings)
 
     head(ws0, ['검토항목', '검토 범위', '검토 건수', '불일치·오류', '확인필요', '주요 발견사항'],
          [26, 44, 9, 10, 9, 110])

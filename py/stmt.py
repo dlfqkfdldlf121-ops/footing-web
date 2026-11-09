@@ -53,6 +53,8 @@ def bs_checks(t, out):
                 if re.match(r'^(I|II|III|IV)\.|총계|부채$|자본$', lab(rows[j])):
                     end = j; break
             det = [v(r, cur) for r in rows[k + 1:end] if v(r, cur) is not None]
+            if not det:
+                continue                  # 세부행 없는 로마숫자 행(예: Ⅱ.비지배지분)
             chk(out, '연결재무상태표', '%s(%s)' % (rows[k]['cells'][0], when), v(rows[k], tot), det,
                 '%d개 세부항목 합산' % len(det))
         ca, nca = find(rows, r'^I\.유동자산'), find(rows, r'^II\.비유동자산')

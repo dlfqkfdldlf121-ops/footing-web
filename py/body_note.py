@@ -57,8 +57,11 @@ def stmt_tables(D):
         L = ' '.join(lab(r) for r in t['rows'][:3])
         if '유동자산' in L:
             res.append(('연결재무상태표', t, [(2, '당반기말'), (3, '당반기말')]))
-        elif '매출액' in L:
-            res.append(('연결포괄손익계산서', t, [(3, '당반기 누적')]))
+        elif '매출액' in L or '영업수익' in L:
+            nm = [re.sub(r'\s', '', c or '') for c in t['cols']]
+            cum = [j for j, c in enumerate(nm) if '누적' in c]
+            first = [j for j in cum if nm[j] == nm[cum[0]]] if cum else [3]   # 당기 누적(소계·합계 열 포함)
+            res.append(('연결포괄손익계산서', t, [(j, '누적') for j in first]))
         elif '영업활동' in L:
             res.append(('연결현금흐름표', t, [(2, '당반기'), (3, '당반기')]))
     return res

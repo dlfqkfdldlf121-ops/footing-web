@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>반기검토보고서 교차대사</title>
+<title>검토보고서 교차대사</title>
 <style>
   :root { --bg:#fff; --fg:#1d2433; --mute:#667085; --line:#e4e7ec; --navy:#1F3864; --soft:#f5f7fb;
           --red:#C00000; --redbg:#FCE4E4; --amb:#BF8F00; --ambbg:#FFF2CC; --ok:#027a48; --okbg:#ecfdf3; }
@@ -46,8 +46,8 @@
 </head>
 <body>
 <main>
-  <h1>반기검토보고서 교차대사</h1>
-  <p class="sub">당기 반기검토보고서를 전기 감사보고서·전년 반기보고서와 대사하고, 검토결과 엑셀과 체크본 PDF를 만듭니다.</p>
+  <h1>반기·분기 검토보고서 교차대사</h1>
+  <p class="sub">당기 반기·분기 검토보고서를 전기 감사보고서·전년 동기 보고서와 대사하고, 검토결과 엑셀과 체크본 PDF를 만듭니다.</p>
   <div class="note">🔒 파일은 이 PC의 브라우저 안에서만 처리됩니다. 서버로 전송하지 않습니다(업로드 없음).</div>
 
   <div class="grid">
@@ -58,9 +58,9 @@
       <label style="color:inherit"><input type="radio" name="kind" value="별도"> 별도</label></div></div>
   </div>
   <div class="grid" style="margin-top:14px">
-    <label class="drop" id="d0"><b>① 당기 반기검토보고서</b><small>대사 기준 · PDF 선택</small><input type="file" accept=".pdf" hidden></label>
+    <label class="drop" id="d0"><b>① 당기 반기·분기 검토보고서</b><small>대사 기준 · PDF 선택</small><input type="file" accept=".pdf" hidden></label>
     <label class="drop" id="d1"><b>② 전기 감사보고서</b><small>전기말 대사 · PDF 선택</small><input type="file" accept=".pdf" hidden></label>
-    <label class="drop" id="d2"><b>③ 전년 반기검토보고서</b><small>전반기 대사 · PDF 선택</small><input type="file" accept=".pdf" hidden></label>
+    <label class="drop" id="d2"><b>③ 전년 동기 검토보고서</b><small>전반기·전분기 대사 · PDF 선택</small><input type="file" accept=".pdf" hidden></label>
   </div>
   <button class="run" id="run" disabled>검토 실행</button>
   <div class="bar" id="bar"><i></i></div>

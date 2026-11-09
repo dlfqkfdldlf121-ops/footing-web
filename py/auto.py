@@ -38,12 +38,23 @@ def analyze(cur_pdf, audit_pdf, half_pdf, company='', period='', kind='연결', 
     H = stitch(extract(half_pdf))
     P('대사 중', 0.70)
     FS = (kind if kind == '연결' else '') + '%s'
+    head = ' '.join(C['pages'][:10])
+    m = re.search(r'제\s*(\d+)\s*\(?당\)?\s*기', head) or re.search(r'제\s*(\d+)\s*기', head)
+    N = int(m.group(1)) if m else None                     # 당기 기수
+    PW = '분기' if re.search(r'\d분기|분기말|분기연결|분기재무', head) else '반기'   # 보고서 종류
     restated = is_restated(C)
+    sq = lambda c: re.sub(r'\s|<[^>]*>', '', c or '')
     merged = '주식병합' in ' '.join(C['pages'])
 
     # ── 시트1
-    x1 = lambda n: n.replace('제29(전)기말', '제29(당)기말').replace('(전)기말', '(당)기말').replace('전기말', '당기말')
-    r1 = compare(C, A, ['전기말', '(전)기말', '전기'], xlat=x1)
+    # 시트1: 당기 보고서의 '전기말'(또는 제N-1기 기말) 열 ↔ 감사보고서 '당기말'(제N-1기 기말)
+    def want1(c):
+        c = sq(c)
+        if '전기' in c and not any(k in c for k in ('전반기', '전분기')):
+            return True
+        return N is not None and ('제%d기기말' % (N - 1) in c or '제%d(전)기말' % (N - 1) in c)
+    x1 = lambda n: n.replace('(전)기말', '(당)기말').replace('전기말', '당기말').replace('전기', '당기')
+    r1 = compare(C, A, want1, xlat=x1)
     row1 = lambda r: dict(gubun=(FS % '재무상태표' if r['page'] <= 10 else r['sec']), item='%s · %s' % (r['item'], r['col']),
                           unit=r['unit'], a=r['a'], b=r['b'], page=r['page'], note='비교 p%d' % r['b_page'])
     s1 = {"col_a": "%s 당기 보고서\n(전기말)" % period, "col_b": "전기 감사보고서\n(당기말)", "sections": [
@@ -51,9 +62,15 @@ def analyze(cur_pdf, audit_pdf, half_pdf, company='', period='', kind='연결', 
         {"title": "Ⅱ. 주석 전기말 열", "rows": [row1(r) for r in r1 if r['page'] > 10]}]}
 
     # ── 시트2
-    x2 = lambda n: n.replace('(전)반기', '(당)반기').replace('전반기', '당반기')
+    # 시트2: 당기 보고서의 전반기·전분기(또는 제N-1기 반기/분기) 열 ↔ 전년 보고서 당반기·당분기
+    def want2(c):
+        c = sq(c)
+        if any(k in c for k in ('전반기', '전분기', '(전)반기', '(전)분기')):
+            return True
+        return N is not None and re.search(r'제%d(\(전\))?기\d?(반기|분기)' % (N - 1), c) is not None and '말' not in c
+    x2 = lambda n: n.replace('(전)반기', '(당)반기').replace('전반기', '당반기').replace('(전)분기', '(당)분기').replace('전분기', '당분기')
     per = lambda c: '3개월' if '3개월' in (c or '') else '누적'
-    r2 = compare(C, H, ['전반기', '(전) 반기', '(전)반기'], per, xlat=x2)
+    r2 = compare(C, H, want2, per, xlat=x2)
     pl_rows = stmt.restated_pl(C, H) if restated else []
     rows2 = []
     for r in r2:
@@ -66,10 +83,10 @@ def analyze(cur_pdf, audit_pdf, half_pdf, company='', period='', kind='연결', 
             vr, nt = '정상변동', '주식병합 소급 재작성 추정: 비교 보고서 × %d' % (r['a'] // r['b'])
         elif restated and r['a'] != r['b'] and any(k in (r['col'] or '') for k in ('3개월', '누적')) and r['page'] > 10:
             # 손익 성격 주석(3개월·누적 열)은 계속영업분만 재작성되어 금액이 달라지는 것이 정상
-            vr, nt = '정상변동', '중단영업 재작성 추정 — 당기 보고서 전반기는 계속영업분만 표시(합계 대사는 Ⅰ섹션)'
+            vr, nt = '정상변동', '중단영업 재작성 추정 — 당기 보고서 전%s는 계속영업분만 표시(합계 대사는 Ⅰ섹션)' % PW
         rows2.append(dict(gubun=r['sec'] if r['page'] > 10 else ('본문 p%d' % r['page']), item='%s · %s' % (r['item'], r['col']),
                           period=r['period'], unit=r['unit'], a=r['a'], b=r['b'], verdict=vr, note=nt, page=r['page']))
-    s2 = {"col_a": "%s 당기 보고서\n(전반기)" % period, "col_b": "전년 반기보고서\n(당반기)", "sections": []}
+    s2 = {"col_a": "%s 당기 보고서\n(전%s)" % (period, PW), "col_b": "전년 %s보고서\n(당%s)" % (PW, PW), "sections": []}
     if pl_rows:
         s2['sections'].append({"title": "Ⅰ. 포괄손익계산서 (단위: 천원) — 중단영업 재작성: 당기 보고서 계속 + 주석 중단 ↔ 전년 본문", "rows": pl_rows})
     s2['sections'].append({"title": "Ⅱ. 본문·주석 전반기 열", "rows": rows2})
@@ -130,7 +147,7 @@ def analyze(cur_pdf, audit_pdf, half_pdf, company='', period='', kind='연결', 
         d = r['a'] - r['b']
         if d and not r['verdict']:
             sev = '하' if abs(d) <= 2 else '상'
-            add(sev, '%s (전반기)' % r['gubun'][:30], '전년 반기보고서와 %s' % ('단수차이' if sev == '하' else '불일치'),
+            add(sev, '%s (전%s)' % (r['gubun'][:30], PW), '전년 %s보고서와 %s' % (PW, '%s') % ('단수차이' if sev == '하' else '불일치'),
                 '%s: %s ↔ 전년 %s' % (r['item'], fmt(r['a']), fmt(r['b'])), '차이 %s — 원인 확인' % fmt(d), r['page'], [r['a']], r['unit'])
     for r in rows3:
         if r.get('verdict') == '확인필요':
@@ -150,7 +167,7 @@ def analyze(cur_pdf, audit_pdf, half_pdf, company='', period='', kind='연결', 
     summary = [
         {"item": "1. 전기말 금액 대사", "scope": "당기 보고서 전기말 열 ↔ 전기 감사보고서 당기말",
          "findings": "자동 대응 %d건 중 차이 %d건" % (len(all1), n(all1, lambda r: r['a'] != r['b']))},
-        {"item": "2. 전반기 금액 대사", "scope": "당기 보고서 전반기 열 ↔ 전년 반기보고서 당반기",
+        {"item": "2. 전%s 금액 대사" % PW, "scope": "당기 보고서 전%s 열 ↔ 전년 %s보고서 당%s" % (PW, PW, PW),
          "findings": "자동 대응 %d건%s" % (len(all2), ' · 중단영업 재작성 반영(계속+중단 합산 대사)' if pl_rows else '')},
         {"item": "3. 본문 ↔ 주석 대사", "scope": "본문 금액을 천원 환산해 주석 표에서 자동 검색",
          "findings": "주석 대응 미발견 %d건(확인필요)" % n(rows3, lambda r: r.get('verdict') == '확인필요')},
@@ -161,7 +178,8 @@ def analyze(cur_pdf, audit_pdf, half_pdf, company='', period='', kind='연결', 
         {"item": "6. 오탈자·표기 검토", "scope": "자동 지적사항 목록(PDF 체크본 번호와 동일)",
          "findings": "자동 등록 %d건. 오탈자·문구 검토는 키 연결 후" % len(F)},
     ]
-    data = {"meta": {"company": company, "period": period, "kind": kind,
+    data = {"sheet_names": {2: '2.전%s_%s보고서대사' % (PW, PW)}, "pw": PW,
+            "meta": {"company": company, "period": period, "kind": kind,
                      "footnote": "※ 자동 대사 결과(판단 문장 없음). 본문 '원', 주석 '천원'. 확인필요 사유는 수동 확인 또는 API 키 연결 시 자동 작성"},
             "summary": summary, "s1": s1, "s2": s2, "s3": s3, "s4": rows4, "s5": s5, "findings": F}
     P('엑셀·체크본 생성', 0.85)

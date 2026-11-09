@@ -10,7 +10,7 @@ import auto, run
 def go(cur, aud, half, company, period, kind, progress):
     p = lambda m, x: progress(m, x)
     data = auto.analyze(cur, aud, half, company=company, period=period, kind=kind, progress=p)
-    stem = '%s_%s반기%s검토보고서' % (company or '회사', period or '', '연결' if kind == '연결' else '(별도)')
+    stem = '%s_%s%s%s검토보고서' % (company or '회사', period or '', data.get('pw', '반기'), '연결' if kind == '연결' else '(별도)')
     out = '/out'
     shutil.rmtree(out, ignore_errors=True)
     xlsx, full, only, pages, misses = run.run(data, cur, out, stem)
