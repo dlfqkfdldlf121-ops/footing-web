@@ -10,6 +10,7 @@ from extract import extract
 from recon import stitch, compare, subtotal_checks
 import stmt
 import body_note
+import typo
 
 fmt = lambda x: format(x, ',')
 
@@ -217,5 +218,15 @@ def analyze(cur_pdf, audit_pdf, half_pdf, company='', period='', kind='연결', 
     data = {"sheet_names": {2: '2.전%s_%s보고서대사' % (PW, PW)}, "pw": PW, "errors": errors,
             "meta": {"company": company, "period": period, "kind": kind, "footnote": foot},
             "summary": summary, "s1": s1, "s2": s2, "s3": s3, "s4": rows4, "s5": s5, "findings": F}
+    # 규칙 기반 표기 검토(오프라인) — 확실한 패턴만, 체크본 PDF에도 표시
+    def typo_scan():
+        for pno, typ, frag, desc in typo.scan(C['pages']):
+            F.append(dict(loc='본문 p%d' % pno, type=typ, current="'%s'" % frag, fix=desc, sev='하',
+                          pdf=dict(page=pno, find=[frag])))
+    safe('표기 검토', typo_scan, None)
+    # 지적 재정렬(상→중→하)은 run 단계에서 수행되므로 여기선 F에 추가만
+    for i, f in enumerate(F):
+        pass
+
     P('엑셀·체크본 생성', 0.85)
     return data

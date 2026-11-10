@@ -1,7 +1,7 @@
 // 계산 전용 작업 스레드: Pyodide(브라우저 안 파이썬)로 대사 엔진을 실행한다. 네트워크로 파일을 보내지 않는다.
 importScripts('https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.js');
 
-const PY_FILES = ['extract.py', 'recon.py', 'stmt.py', 'body_note.py', 'gen_excel.py', 'pdf_check.py', 'run.py', 'auto.py', 'webrun.py'];
+const PY_FILES = ['extract.py', 'recon.py', 'stmt.py', 'body_note.py', 'gen_excel.py', 'pdf_check.py', 'run.py', 'auto.py', 'typo.py', 'webrun.py'];
 const WHEELS = ['wheels/pymupdf-1.28.2-cp313-abi3-pyodide_2025_0_wasm32.whl',
                 'wheels/et_xmlfile-2.0.0-py3-none-any.whl', 'wheels/openpyxl-3.1.5-py2.py3-none-any.whl'];
 const FONTS = ['fonts/NotoKR-R.otf', 'fonts/NotoKR-B.otf'];
