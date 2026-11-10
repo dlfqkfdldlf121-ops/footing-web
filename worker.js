@@ -33,6 +33,7 @@ self.onmessage = async (ev) => {
     }
     const prog = (m, x) => say('status', { msg: m, p: x });
     const res = JSON.parse(await py.pyimport('webrun').go(names[0], names[1], names[2], company, period, kind, prog));
+    if (res.error) { say('error', { msg: res.error + '\n\n' + (res.traceback || '') }); return; }
     const out = {};
     for (const k of ['xlsx', 'full', 'only']) {
       out[k] = { name: res.files[k].split('/').pop(), data: py.FS.readFile(res.files[k]) };
