@@ -112,8 +112,8 @@ async function boot(){
     await py.loadPackage(['fonttools'].concat(WHEELS.map(w=>REMOTE+w)), { checkIntegrity:false });
     setP(0.7,'대사 엔진 준비 중');
     py.FS.mkdirTree('/app/py'); py.FS.mkdirTree('/app/fonts');
-    for (const f of PY_FILES) py.FS.writeFile('/app/py/'+f, await (await fetch(REMOTE+'py/'+f)).text());
-    for (const f of FONTS) py.FS.writeFile('/app/'+f, new Uint8Array(await (await fetch(REMOTE+f)).arrayBuffer()));
+    for (const f of PY_FILES) py.FS.writeFile('/app/py/'+f, await (await fetch(REMOTE+'py/'+f+'?t='+Date.now())).text());
+    for (const f of FONTS) py.FS.writeFile('/app/'+f, new Uint8Array(await (await fetch(REMOTE+f+'?t='+Date.now())).arrayBuffer()));
     await py.runPythonAsync("import sys; sys.path.insert(0,'/app/py'); import webrun");
     engineReady = true; $('#bar').style.display='none'; $('#msg').textContent='준비 완료 — PDF 3개를 선택하세요.'; refresh();
   } catch(e){ $('#err').style.display='block'; $('#err').textContent='엔진 준비 실패\n'+String(e); $('#msg').textContent='엔진 준비 실패'; }

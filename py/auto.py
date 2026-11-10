@@ -24,8 +24,18 @@ def pdf_num(v, unit):
 
 
 def is_restated(cur):
-    txt = ' '.join(cur['pages'][:12])
-    return '중단영업' in txt
+    # '중단영업'이 포괄손익계산서 본문의 한 줄로 실제 표시된 경우에만 재작성으로 본다
+    # (회계정책 서술에만 등장하는 경우는 제외)
+    import re as _re
+    for t in cur['tables']:
+        if t['page'] > 10:
+            continue
+        L = ' '.join((r['cells'][0] or '') for r in t['rows'][:3])
+        if ('매출액' in L or '영업수익' in L):
+            for r in t['rows']:
+                if _re.search(r'중단영업', _re.sub(r'\s', '', r['cells'][0] or '')):
+                    return True
+    return False
 
 
 def analyze(cur_pdf, audit_pdf, half_pdf, company='', period='', kind='연결', progress=None):

@@ -165,10 +165,13 @@ def statement_checks(D):
 
 def restated_pl(cur, prev_half):
     """FY26 전반기(계속) + 주석 중단영업 전반기 ↔ FY25 반기 본문 (천원 비교)."""
-    pl = next(t for t in cur['tables'] if t['page'] <= 10 and '매출액' in ' '.join(lab(r) for r in t['rows'][:2]))
+    def find_pl(D):
+        return next((t for t in D['tables'] if t['page'] <= 10
+                     and any(k in ' '.join(lab(r) for r in t['rows'][:3]) for k in ('매출액', '영업수익'))), None)
+    pl = find_pl(cur)
     disc = next((t for t in cur['tables'] if '중단영업' in t['note'] and '(1)' in t['sub']), None)
-    old = next(t for t in prev_half['tables'] if t['page'] <= 10 and '매출액' in ' '.join(lab(r) for r in t['rows'][:2]))
-    if disc is None:
+    old = find_pl(prev_half)
+    if disc is None or pl is None or old is None:
         return []
     m = [  # (FY26 본문, 중단 주석, FY25 본문, 표시명, 부호: 중단 주석이 비용을 음수로 표시하면 -1)
         (r'^I\.매출액', r'^매출액', r'^I\.매출액', 'Ⅰ. 매출액(계속+중단)', 1),
