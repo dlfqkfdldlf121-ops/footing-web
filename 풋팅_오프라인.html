@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>검토보고서 교차대사 (오프라인)</title>
+<style>
+  :root { --bg:#fff; --fg:#1d2433; --mute:#667085; --line:#e4e7ec; --navy:#1F3864; --soft:#f5f7fb;
+          --red:#C00000; --redbg:#FCE4E4; --amb:#BF8F00; --ambbg:#FFF2CC; --ok:#027a48; --okbg:#ecfdf3; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.55 "Pretendard","Malgun Gothic",system-ui,sans-serif; }
+  main { max-width:1100px; margin:0 auto; padding:28px 16px 60px; }
+  h1 { font-size:24px; margin:0 0 4px; } .sub { color:var(--mute); margin:0 0 16px; font-size:14px; }
+  .note { background:var(--okbg); color:var(--ok); border-radius:8px; padding:10px 14px; font-size:14px; margin-bottom:16px; }
+  .warn { background:var(--ambbg); color:var(--amb); border-radius:8px; padding:10px 14px; font-size:13px; margin-bottom:16px; display:none; }
+  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  @media (max-width:760px){ .grid { grid-template-columns:1fr; } }
+  label { display:block; font-size:13px; color:var(--mute); margin-bottom:4px; }
+  input[type=text] { width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font:inherit; }
+  .drop { border:1.5px dashed var(--line); border-radius:10px; padding:14px; background:var(--soft); min-height:84px; cursor:pointer; display:block; }
+  .drop.has { border-style:solid; border-color:var(--navy); background:#eef2fb; }
+  .drop b { display:block; font-size:14px; margin-bottom:6px; } .drop small { color:var(--mute); word-break:break-all; }
+  .kind { display:flex; gap:14px; padding-top:8px; }
+  button.run { margin-top:16px; background:var(--navy); color:#fff; border:0; border-radius:8px; padding:11px 22px; font:inherit; font-weight:600; cursor:pointer; }
+  button.run:disabled { background:#b8c0d0; cursor:not-allowed; }
+  .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; margin-top:14px; display:none; }
+  .bar i { display:block; height:100%; width:0; background:var(--navy); transition:width .3s; }
+  #msg { color:var(--mute); font-size:13px; margin-top:6px; min-height:20px; }
+  .kpi { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:18px 0; }
+  @media (max-width:760px){ .kpi { grid-template-columns:repeat(2,1fr); } }
+  .kpi div { border:1px solid var(--line); border-radius:10px; padding:10px 14px; }
+  .kpi span { color:var(--mute); font-size:13px; } .kpi strong { display:block; font-size:26px; }
+  .k-red strong { color:var(--red); } .k-amb strong { color:var(--amb); }
+  table { width:100%; border-collapse:collapse; font-size:13.5px; }
+  th { background:var(--navy); color:#fff; text-align:left; padding:7px 8px; font-weight:600; }
+  td { border-bottom:1px solid var(--line); padding:6px 8px; vertical-align:top; }
+  .tw { overflow-x:auto; margin-bottom:18px; }
+  .sev-상 { background:var(--redbg); color:var(--red); font-weight:700; text-align:center; }
+  .sev-중 { background:var(--ambbg); color:var(--amb); font-weight:700; text-align:center; }
+  .sev-하 { text-align:center; color:var(--mute); }
+  .dl { display:flex; flex-wrap:wrap; gap:10px; margin:6px 0 22px; }
+  .dl a { border:1px solid var(--navy); color:var(--navy); border-radius:8px; padding:9px 14px; text-decoration:none; font-weight:600; font-size:14px; cursor:pointer; }
+  .dl a.pri { background:var(--navy); color:#fff; }
+  #out { display:none; } h2 { font-size:18px; margin:24px 0 10px; }
+  .err { background:var(--redbg); color:var(--red); padding:10px 14px; border-radius:8px; white-space:pre-wrap; font-size:12px; display:none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>반기·분기 검토보고서 교차대사 <span style="font-size:14px;color:#667085;font-weight:400">오프라인판</span></h1>
+  <p class="sub">당기 반기·분기 검토보고서를 전기 감사보고서·전년 동기 보고서와 대사하고, 검토결과 엑셀과 체크본 PDF를 만듭니다.</p>
+  <div class="note">🔒 이 파일은 내 PC 안에서 열립니다(주소창이 file:// 로 시작). PDF는 이 PC의 브라우저 안에서만 처리되고, 어디에도 전송되지 않습니다. 프로그램(엔진·폰트)만 인터넷에서 내려받습니다.</div>
+  <div class="warn" id="offwarn"></div>
+
+  <div class="grid">
+    <div><label>회사명</label><input type="text" id="company" placeholder="회사명"></div>
+    <div><label>기간</label><input type="text" id="period" placeholder="예: FY26 / FY25 3Q"></div>
+    <div><label>구분</label><div class="kind">
+      <label style="color:inherit"><input type="radio" name="kind" value="연결" checked> 연결</label>
+      <label style="color:inherit"><input type="radio" name="kind" value="별도"> 별도</label></div></div>
+  </div>
+  <div class="grid" style="margin-top:14px">
+    <label class="drop" id="d0"><b>① 당기 반기·분기 검토보고서</b><small>대사 기준 · PDF 선택</small><input type="file" accept=".pdf" hidden></label>
+    <label class="drop" id="d1"><b>② 전기 감사보고서</b><small>전기말 대사 · PDF 선택</small><input type="file" accept=".pdf" hidden></label>
+    <label class="drop" id="d2"><b>③ 전년 동기 검토보고서</b><small>전반기·전분기 대사 · PDF 선택</small><input type="file" accept=".pdf" hidden></label>
+  </div>
+  <button class="run" id="run" disabled>검토 실행</button>
+  <div class="bar" id="bar"><i></i></div>
+  <div id="msg">엔진 준비 중…</div>
+  <div class="err" id="err"></div>
+
+  <section id="out">
+    <div class="kpi">
+      <div class="k-red"><span>오류(상)</span><strong id="k1">0</strong></div>
+      <div class="k-amb"><span>확인필요(중)</span><strong id="k2">0</strong></div>
+      <div><span>표기·단수(하)</span><strong id="k3">0</strong></div>
+      <div><span>체크 페이지</span><strong id="k4">0</strong></div>
+    </div>
+    <div class="dl" id="dl"></div>
+    <h2>요약</h2><div class="tw"><table id="sum"></table></div>
+    <h2>지적사항</h2><div class="tw"><table id="fd"></table></div>
+  </section>
+</main>
+
+<script>
+// 프로그램(엔진·폰트·파이썬 패키지)을 내려받는 곳. 공개 저장소의 GitHub Pages.
+const REMOTE = 'https://dlfqkfdldlf121-ops.github.io/footing-web/';
+const PYODIDE = 'https://cdn.jsdelivr.net/pyodide/v0.28.3/full/';
+const PY_FILES = ['extract.py','recon.py','stmt.py','body_note.py','gen_excel.py','pdf_check.py','run.py','auto.py','webrun.py'];
+const WHEELS = ['wheels/pymupdf-1.28.2-cp313-abi3-pyodide_2025_0_wasm32.whl',
+                'wheels/et_xmlfile-2.0.0-py3-none-any.whl','wheels/openpyxl-3.1.5-py2.py3-none-any.whl'];
+const FONTS = ['fonts/NotoKR-R.otf','fonts/NotoKR-B.otf'];
+const $ = s => document.querySelector(s);
+const files = [null,null,null];
+let py = null, engineReady = false, t0 = 0;
+
+if (location.protocol !== 'file:') {
+  $('#offwarn').style.display = 'block';
+  $('#offwarn').textContent = '⚠ 이 페이지가 file:// 로 열리지 않았습니다. 주소창이 file:// 로 시작하도록, 내려받은 HTML 파일을 더블클릭해서 여세요.';
+}
+
+function setP(p,m){ $('#bar').style.display='block'; $('#bar i').style.width=Math.round(p*100)+'%'; if(m) $('#msg').textContent=m; }
+function refresh(){ $('#run').disabled = !(engineReady && files.every(Boolean)); }
+
+async function boot(){
+  try {
+    setP(0.02,'엔진 불러오는 중 (처음 한 번 30초 내외)');
+    const s = document.createElement('script'); s.src = PYODIDE + 'pyodide.js';
+    await new Promise((ok,no)=>{ s.onload=ok; s.onerror=()=>no(new Error('Pyodide 다운로드 실패 — 인터넷 연결 확인')); document.head.appendChild(s); });
+    py = await loadPyodide({ indexURL: PYODIDE });
+    setP(0.3,'회계 처리 라이브러리 설치 중');
+    await py.loadPackage(['fonttools'].concat(WHEELS.map(w=>REMOTE+w)), { checkIntegrity:false });
+    setP(0.7,'대사 엔진 준비 중');
+    py.FS.mkdirTree('/app/py'); py.FS.mkdirTree('/app/fonts');
+    for (const f of PY_FILES) py.FS.writeFile('/app/py/'+f, await (await fetch(REMOTE+'py/'+f)).text());
+    for (const f of FONTS) py.FS.writeFile('/app/'+f, new Uint8Array(await (await fetch(REMOTE+f)).arrayBuffer()));
+    await py.runPythonAsync("import sys; sys.path.insert(0,'/app/py'); import webrun");
+    engineReady = true; $('#bar').style.display='none'; $('#msg').textContent='준비 완료 — PDF 3개를 선택하세요.'; refresh();
+  } catch(e){ $('#err').style.display='block'; $('#err').textContent='엔진 준비 실패\n'+String(e); $('#msg').textContent='엔진 준비 실패'; }
+}
+
+[0,1,2].forEach(i=>{
+  const box=$('#d'+i), inp=box.querySelector('input');
+  inp.addEventListener('change',()=>{ const f=inp.files[0]; if(!f) return;
+    files[i]=f; box.classList.add('has'); box.querySelector('small').textContent=f.name+' · '+Math.round(f.size/1024)+'KB'; refresh(); });
+});
+
+$('#run').addEventListener('click', async ()=>{
+  $('#run').disabled=true; $('#err').style.display='none'; $('#out').style.display='none'; t0=performance.now();
+  try {
+    py.FS.mkdirTree('/in');
+    const names=[];
+    for (const [i,f] of files.entries()){
+      const p = '/in/'+(i===0 ? f.name : ['cur','aud','half'][i]+'.pdf');
+      py.FS.writeFile(p, new Uint8Array(await f.arrayBuffer())); names.push(p);
+    }
+    const prog = (m,x)=>setP(x,m);
+    const webrun = py.pyimport('webrun');
+    const resStr = await webrun.go(names[0],names[1],names[2],
+      $('#company').value.trim(), $('#period').value.trim(),
+      document.querySelector('input[name=kind]:checked').value, prog);
+    const res = JSON.parse(resStr);
+    const out = {};
+    for (const k of ['xlsx','full','only']) out[k] = { name: res.files[k].split('/').pop(), data: py.FS.readFile(res.files[k]) };
+    show(res, out);
+  } catch(e){ $('#err').style.display='block'; $('#err').textContent='처리 오류\n'+String(e); $('#run').disabled=false; }
+});
+
+const esc = s => String(s ?? '').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+function show(res,out){
+  setP(1,'완료 ('+Math.round((performance.now()-t0)/1000)+'초)'); $('#run').disabled=false;
+  const sev=res.findings.map(f=>f.sev);
+  $('#k1').textContent=sev.filter(s=>s==='상').length; $('#k2').textContent=sev.filter(s=>s==='중').length;
+  $('#k3').textContent=sev.filter(s=>s==='하').length; $('#k4').textContent=res.pages.length;
+  const mime={xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',full:'application/pdf',only:'application/pdf'};
+  const label={xlsx:'검토결과 엑셀',full:'체크본 PDF (전체)',only:'체크본 PDF (체크페이지만)'};
+  $('#dl').innerHTML='';
+  for (const k of ['xlsx','full','only']){
+    const a=document.createElement('a'); a.textContent=label[k]; a.download=out[k].name;
+    a.href=URL.createObjectURL(new Blob([out[k].data],{type:mime[k]})); if(k==='xlsx') a.className='pri'; $('#dl').appendChild(a);
+  }
+  $('#sum').innerHTML='<tr><th style="width:24%">검토항목</th><th>결과</th></tr>'+
+    res.summary.map(s=>`<tr><td>${esc(s.item)}</td><td>${esc(s.findings)}</td></tr>`).join('');
+  $('#fd').innerHTML='<tr><th>No</th><th>중요도</th><th>위치</th><th>유형</th><th>내용</th><th>쪽</th></tr>'+
+    res.findings.map(f=>`<tr><td>${f.no}</td><td class="sev-${f.sev}">${f.sev}</td><td>${esc(f.loc)}</td><td>${esc(f.type)}</td><td>${esc(f.current)}</td><td>${f.page ?? ''}</td></tr>`).join('');
+  $('#out').style.display='block';
+}
+boot();
+</script>
+</body>
+</html>
