@@ -163,6 +163,7 @@ def subtotal_checks(T, tol):
         ncol = t['ncol']
         # (1) 열 합계
         CUR = re.compile(r'^(USD|EUR|JPY|CNY|VND|PEN|GBP|HKD|SGD|AUD|CAD|IDR|THB|PHP|MYR|INR|MXN|BRL|CHF)\b')
+        col_res = []
         for j in range(1, ncol):
             if any(CUR.match((r['cells'][j] or '').strip()) for r in rows if j < len(r['cells'])):
                 continue          # 외화 표시가 섞인 열은 원화 합계와 비교 불가
@@ -181,7 +182,7 @@ def subtotal_checks(T, tol):
                         cands = [sum(seg), sum(allv), sum(subs) if subs else None]
                         ok = any(c is not None and abs(c - v) <= tol for c in cands)
                         best = min((c for c in cands if c is not None), key=lambda c: abs(c - v))
-                        out.append(dict(page=t['page'], sec=sec, unit=t['unit'] or '천원',
+                        col_res.append(dict(page=t['page'], sec=sec, unit=t['unit'] or '천원',
                                         target='%s · %s' % ((r['cells'][0] or r['cells'][1] or '합계').strip(), t['cols'][j]),
                                         shown=v, recalc=best, n=len(seg), exact=ok))
                     lab0 = re.sub(r'\s', '', (r['cells'][0] or '') + (r['cells'][1] or '' if len(r['cells']) > 1 else ''))
@@ -192,6 +193,9 @@ def subtotal_checks(T, tol):
                     seg = []
                 else:
                     push_infer(seg, v, tol); push_infer(allv, v, tol)
+        # 열 합계: 그 표가 실제 합산 표일 때만 채택(비합산 표-사채·수준별·금융손익 등 제외)
+        if col_res and sum(x['exact'] for x in col_res) >= len(col_res) * 0.6:
+            out += col_res
         # (1b) 행 합계: '합계' 열 = 앞쪽 금액 열 합 (부문별 정보 등)
         tc = [i for i, c in enumerate(t['cols']) if re.sub(r'\s', '', c or '').endswith('합계')]
         if tc and tc[-1] == ncol - 1 and ncol >= 4:
