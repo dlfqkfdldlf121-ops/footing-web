@@ -19,6 +19,6 @@ def go(cur, aud, half, company, period, kind, progress):
         'summary': data['summary'],
         'findings': [{'no': f['no'], 'sev': f['sev'], 'loc': f['loc'], 'type': f['type'], 'current': f['current'],
                       'page': f['pdf'].get('page')} for f in data['findings']],
-        'pages': pages, 'misses': len(misses),
+        'pages': pages, 'misses': len(misses), 'errors': data.get('errors', []),
         'files': {'xlsx': xlsx, 'full': full, 'only': only},
     }, ensure_ascii=False)

@@ -163,6 +163,14 @@ function show(res,out){
     res.summary.map(s=>`<tr><td>${esc(s.item)}</td><td>${esc(s.findings)}</td></tr>`).join('');
   $('#fd').innerHTML='<tr><th>No</th><th>중요도</th><th>위치</th><th>유형</th><th>내용</th><th>쪽</th></tr>'+
     res.findings.map(f=>`<tr><td>${f.no}</td><td class="sev-${f.sev}">${f.sev}</td><td>${esc(f.loc)}</td><td>${esc(f.type)}</td><td>${esc(f.current)}</td><td>${f.page ?? ''}</td></tr>`).join('');
+  if (res.errors && res.errors.length){
+    let w=document.getElementById('skipwarn');
+    if(!w){ w=document.createElement('div'); w.id='skipwarn';
+      w.style.cssText='background:#FCE4E4;color:#C00000;border-radius:8px;padding:10px 14px;font-size:13px;margin:0 0 14px'; 
+      document.getElementById('out').prepend(w); }
+    w.textContent='⚠ 일부 검토 항목을 건너뛰었습니다(그 부분은 결과에 없음). 해당 재무제표는 수동 확인이 필요합니다: '+res.errors.join(' · ');
+    w.style.display='block';
+  } else { const w=document.getElementById('skipwarn'); if(w) w.style.display='none'; }
   $('#out').style.display='block';
 }
 boot();
