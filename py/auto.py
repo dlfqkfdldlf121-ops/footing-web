@@ -179,7 +179,16 @@ def analyze(cur_pdf, audit_pdf, half_pdf, company='', period='', kind='연결', 
         for sec in s5['sections']:
             for r in sec['rows']:
                 d = r['shown'] - r['recalc']
-                if abs(d) > (1 if r['unit'] != '원' else 0):
+                tol = 1 if r['unit'] != '원' else 0
+                if abs(d) <= tol:
+                    continue
+                # 재계산 차이가 크면(표시액의 1% 또는 1천만 초과) 회사 오류라기보다 표 인식 가능성 → '확인필요'로 내림
+                big = abs(d) > max(abs(r['shown']) * 0.01, 10_000_000 if r['unit'] == '원' else 10_000)
+                if big:
+                    add('중', r['gubun'], '소계 재계산 불일치(표 구조 확인)',
+                        '%s: 표시 %s ↔ 재계산 %s' % (r['target'], fmt(r['shown']), fmt(r['recalc'])),
+                        '세부항목 합산과 큰 차이 — 표 인식 또는 구조(소계 중복 등) 확인 필요', r['page'], [r['shown']], r['unit'])
+                else:
                     add('상', r['gubun'], '소계·합계 산술 오류', '%s: 표시 %s ↔ 재계산 %s' % (r['target'], fmt(r['shown']), fmt(r['recalc'])),
                         '차이 %s — 표시 금액 정정' % fmt(d), r['page'], [r['shown']], r['unit'])
     safe('지적사항 등록', findings_build, None)

@@ -207,7 +207,8 @@ def subtotal_checks(T, tol):
                                    target='%s · 행 합계' % (r['cells'][0] or '').strip(),
                                    shown=ve, recalc=sum(vals), n=len(vals), exact=abs(sum(vals) - ve) <= tol))
             # 합산 표가 아닌 경우(계약금액·진행률 등 열이 섞인 표)는 대부분 행이 안 맞는다 → 표 전체 제외
-            if rowres and sum(x['exact'] for x in rowres) * 2 >= len(rowres):
+            # 합산 표인지 확인: 거의 모든 행이 정확히 맞을 때만 채택(취득원가/상각/장부금액 같은 비합산 표 제외)
+            if rowres and sum(x['exact'] for x in rowres) >= len(rowres) - 1 and len(rowres) >= 2:
                 out += rowres
         # (2) 변동표: 첫 값열이 '초', 마지막 값열이 '말'
         cols = t['cols']

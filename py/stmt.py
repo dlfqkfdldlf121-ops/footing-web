@@ -39,40 +39,64 @@ def chk(out, sec, target, shown, parts, note, unit='원'):
     out.append(dict(gubun=sec, target=target, unit=unit, shown=shown, recalc=sum(parts), note=note))
 
 
+def period_groups(t):
+    """표의 금액 열을 '당기(말)'·'전기(말)' 그룹으로 나눈다. (분리된 빈 열까지 묶음)"""
+    H = lambda c: re.sub(r'\s', '', c or '')
+    dang, jeon = [], []
+    for i, c in enumerate(t['cols']):
+        h = H(c)
+        if any(k in h for k in ('당기말', '당반기말', '당분기말')) or (('(당)' in h or '당' == h[:1]) and '말' in h):
+            dang.append(i)
+        elif any(k in h for k in ('전기말', '전기', '(전)기말')):
+            jeon.append(i)
+    # 못 나누면 숫자가 가장 많은 두 열을 당·전으로
+    if not dang or not jeon:
+        return None, None
+    return dang, jeon
+
+
+def amt(row, cols):
+    for i in cols:
+        if i < len(row['nums']) and isinstance(row['nums'][i], (int, float)):
+            return row['nums'][i]
+    return None
+
+
 def bs_checks(t, out):
     rows = t['rows']
-    blocks = []                       # (roman 행 index, 합계열)
-    for k, r in enumerate(rows):
-        if re.match(r'^(I|II)\.', lab(r)):
-            blocks.append(k)
-    for cur, tot in ((2, 3), (4, 5)):
-        when = '당반기말' if cur == 2 else '전기말'
-        for bi, k in enumerate(blocks):
+    dang, jeon = period_groups(t)
+    if dang is None:
+        return                          # 기간 열을 확신 못 하면 본문 BS 검증 건너뜀
+    blocks = [k for k, r in enumerate(rows) if re.match(r'^(I|II)\.', lab(r))]
+    for cols, when in ((dang, '당기말'), (jeon, '전기말')):
+        for k in blocks:
             end = len(rows)
             for j in range(k + 1, len(rows)):
-                if re.match(r'^(I|II|III|IV)\.|총계|부채$|자본$', lab(rows[j])):
+                lj = lab(rows[j])
+                if re.match(r'^(I|II|III|IV|V)\.', lj) or '총계' in lj or lj in ('부채', '자본', '자본금'):
                     end = j; break
-            det = [v(r, cur) for r in rows[k + 1:end] if v(r, cur) is not None]
+            det = [amt(r, cols) for r in rows[k + 1:end]
+                   if amt(r, cols) is not None and '총계' not in lab(r) and '소계' not in lab(r)]
             if not det:
-                continue                  # 세부행 없는 로마숫자 행(예: Ⅱ.비지배지분)
-            chk(out, '연결재무상태표', '%s(%s)' % (rows[k]['cells'][0], when), v(rows[k], tot), det,
+                continue
+            chk(out, '연결재무상태표', '%s(%s)' % (rows[k]['cells'][0], when), amt(rows[k], cols), det,
                 '%d개 세부항목 합산' % len(det))
-        ca, nca = find(rows, r'^I\.유동자산'), find(rows, r'^II\.비유동자산')
-        ta = find(rows, r'^자산총계')
-        cl, ncl = find(rows, r'^I\.유동부채'), find(rows, r'^II\.비유동부채')
-        tl = find(rows, r'^부채총계')
-        own = find(rows, r'지배기업의소유주지분')
-        caps = [find(rows, p) for p in (r'^I\.자본금', r'^II\.자본잉여금', r'^III\.기타자본', r'^IV\.결손금|^IV\.이익잉여금')]
-        nci = find(rows, r'^비지배지분')
-        te = find(rows, r'^자본총계')
-        tle = find(rows, r'^부채및자본총계')
-        chk(out, '연결재무상태표', '자산총계(%s)' % when, v(ta, tot), [v(ca, tot), v(nca, tot)], '유동 + 비유동')
-        chk(out, '연결재무상태표', '부채총계(%s)' % when, v(tl, tot), [v(cl, tot), v(ncl, tot)], '유동 + 비유동')
-        chk(out, '연결재무상태표', '지배기업의 소유주지분(%s)' % when, v(own, tot), [v(c, cur) for c in caps],
-            '자본금 + 자본잉여금 + 기타자본 + 결손금')
-        chk(out, '연결재무상태표', '자본총계(%s)' % when, v(te, tot), [v(own, tot), v(nci, tot)], '지배 + 비지배')
-        chk(out, '연결재무상태표', '부채 및 자본 총계(%s)' % when, v(tle, tot), [v(tl, tot), v(te, tot)], '부채총계 + 자본총계')
-        chk(out, '연결재무상태표', '대차 일치(%s)' % when, v(ta, tot), [v(tle, tot)], '자산총계 = 부채및자본총계')
+        R = lambda p: find(rows, p)
+        ca, nca, ta = R(r'^I\.유동자산'), R(r'^II\.비유동자산'), R(r'^자산총계')
+        cl, ncl, tl = R(r'^I\.유동부채'), R(r'^II\.비유동부채'), R(r'^부채총계')
+        own = R(r'지배기업의소유주지분|지배기업소유주지분')
+        caps = [R(p) for p in (r'^I\.자본금', r'^II\.자본잉여금|^II\.주식발행초과금', r'^III\.기타자본|^III\.기타포괄', r'^IV\.결손금|^IV\.이익잉여금')]
+        nci = R(r'^비지배지분')
+        te, tle = R(r'^자본총계|^자본 ?총계'), R(r'^부채및자본총계|^부채 및 자본')
+        A = lambda row: amt(row, cols) if row else None
+        chk(out, '연결재무상태표', '자산총계(%s)' % when, A(ta), [A(ca), A(nca)], '유동 + 비유동')
+        chk(out, '연결재무상태표', '부채총계(%s)' % when, A(tl), [A(cl), A(ncl)], '유동 + 비유동')
+        if own and all(caps):
+            chk(out, '연결재무상태표', '지배기업의 소유주지분(%s)' % when, A(own), [A(c) for c in caps],
+                '자본금 + 자본잉여금 + 기타자본 + 결손금')
+        chk(out, '연결재무상태표', '자본총계(%s)' % when, A(te), [A(own), A(nci)], '지배 + 비지배')
+        chk(out, '연결재무상태표', '부채 및 자본 총계(%s)' % when, A(tle), [A(tl), A(te)], '부채총계 + 자본총계')
+        chk(out, '연결재무상태표', '대차 일치(%s)' % when, A(ta), [A(tle)], '자산총계 = 부채및자본총계')
 
 
 def pl_checks(t, out):
@@ -110,23 +134,51 @@ def pl_checks(t, out):
 
 
 def sce_checks(t, out):
-    rows = t['rows']
-    G = '연결자본변동표'
-    for r in rows:
-        n = r['nums']
-        if len(n) >= 9 and all(isinstance(n[i], (int, float)) for i in range(2, 9)):
-            chk(out, G, '%s 지배기업 소계' % r['cells'][0], n[6], n[2:6], '자본금+자본잉여금+기타자본+결손금')
-            chk(out, G, '%s 합계' % r['cells'][0], n[8], [n[6], n[7]], '지배 소계 + 비지배')
+    """연결자본변동표: 금액 열 판별 + 머리글 역할 식별로, 확실할 때만 검증(애매하면 건너뜀)."""
+    rows = t['rows']; G = '연결자본변동표'; cols = t['cols']; ncol = t['ncol']
+    H = lambda i: re.sub(r'\s', '', cols[i] or '') if i < len(cols) and cols[i] else ''
+    # 금액 열: 숫자 셀이 충분히 많은 열(라벨·주석 열 제외)
+    def numeric_count(i):
+        return sum(1 for r in rows if i < len(r['nums']) and isinstance(r['nums'][i], (int, float)))
+    need = max(3, len(rows) // 3)
+    amt = [i for i in range(1, ncol) if numeric_count(i) >= need and '주석' not in H(i) and '주 석' not in (cols[i] or '')]
+    if len(amt) < 3:
+        return
+    tot_i = next((i for i in reversed(amt) if '총자본' in H(i) or '총계' in H(i)
+                  or (H(i).endswith('합계') and '지배' not in H(i) and '비지배' not in H(i))), amt[-1])
+    nci_i = next((i for i in amt if '비지배' in H(i)), None)
+    sub_i = next((i for i in amt if '지배' in H(i) and ('소계' in H(i) or '합계' in H(i))
+                  and '비지배' not in H(i) and '총' not in H(i) and i != tot_i), None)
+    end_comp = sub_i if sub_i is not None else (nci_i if nci_i is not None else tot_i)
+    comp = [i for i in amt if i < end_comp and i not in (sub_i, nci_i, tot_i)]
+
+    def g(nums, i):
+        x = nums[i] if (i is not None and i < len(nums)) else None
+        return x if isinstance(x, (int, float)) else None
+
+    if comp and (sub_i is not None or (nci_i is not None and tot_i is not None)):
+        for r in rows:
+            nums = r['nums']
+            cs = [g(nums, i) for i in comp]
+            if sub_i is not None and g(nums, sub_i) is not None and cs and all(c is not None for c in cs):
+                chk(out, G, '%s 지배기업 소계' % (r['cells'][0] or '').strip(), g(nums, sub_i), cs, '성분 합')
+            if tot_i is not None and g(nums, tot_i) is not None:
+                base = ([g(nums, sub_i)] if sub_i is not None else cs) + ([g(nums, nci_i)] if nci_i is not None else [])
+                if len(base) >= 2 and all(b is not None for b in base):
+                    chk(out, G, '%s 총계' % (r['cells'][0] or '').strip(), g(nums, tot_i), base,
+                        ('지배 소계' if sub_i is not None else '성분 합') + (' + 비지배' if nci_i is not None else ''))
     # 열 방향: 기초 + 변동 = 기말
-    starts = [k for k, r in enumerate(rows) if re.search(r'반기초|기초\)', lab(r))]
-    for s in starts:
-        e = next((k for k in range(s + 1, len(rows)) if re.search(r'반기말|기말\)', lab(rows[k]))), None)
+    starts = [k for k, r in enumerate(rows) if re.search(r'반기초|분기초|기초\)', lab(r))]
+    for st in starts:
+        e = next((k for k in range(st + 1, len(rows)) if re.search(r'반기말|분기말|기말\)', lab(rows[k]))), None)
         if e is None:
             continue
-        for j, cname in zip(range(2, 9), t['cols'][2:9]):
-            parts = [v(rows[k], j) for k in range(s, e) if v(rows[k], j) is not None]
-            chk(out, G, '%s %s 열' % (rows[e]['cells'][0], cname.replace('지배기업 소유주 ', '')), v(rows[e], j), parts,
-                '기초 + %d개 변동' % (len(parts) - 1))
+        for j in amt:
+            parts = [v(rows[k], j) for k in range(st, e) if v(rows[k], j) is not None]
+            if len(parts) < 2:
+                continue
+            chk(out, G, '%s %s 열' % ((rows[e]['cells'][0] or '').strip(), (cols[j] or '').replace('지배기업 소유주 ', '')),
+                v(rows[e], j), parts, '기초 + %d개 변동' % (len(parts) - 1))
 
 
 def cf_checks(t, out):
